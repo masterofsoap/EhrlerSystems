@@ -30,6 +30,7 @@ body { overflow: hidden; }
 .convo.active::before { content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; background: var(--accent); border-radius: 2px; }
 .convo .tag { flex: none; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 5px; font: 700 9px/1 var(--font-mono); background: var(--panel-3); color: var(--muted); }
 .convo .tag.code { color: var(--signal); }
+.convo .tag.think { color: var(--think); font-size: 12px; }
 .convo .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .convo .more { opacity: 0; width: 26px; height: 26px; }
 .convo:hover .more, .convo.active .more { opacity: 1; }
@@ -58,11 +59,15 @@ body { overflow: hidden; }
 .conv-title h1:hover { background: var(--panel); }
 .conv-title input { font: 600 15px/1.2 var(--font-display); background: var(--panel); border: 1px solid var(--accent); border-radius: 6px; padding: 4px 6px; outline: none; width: min(420px, 100%); }
 
-.mode-switch { position: relative; display: grid; grid-template-columns: 1fr 1fr; padding: 3px; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 10px; }
+.mode-switch { position: relative; display: grid; grid-template-columns: 1fr 1fr 1fr; padding: 3px; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 10px; }
 .mode-switch button { position: relative; z-index: 1; height: 32px; padding: 0 16px; border: 0; background: none; cursor: pointer; color: var(--muted); font: 600 11.5px/1 var(--font-display); letter-spacing: 0.14em; text-transform: uppercase; display: inline-flex; align-items: center; gap: 7px; transition: color 0.2s; }
 .mode-switch button[aria-pressed="true"] { color: #0a0a0a; }
-.mode-switch .pill { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); background: var(--accent); clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); transition: transform 0.3s var(--ease), background 0.3s; }
+.mode-switch .pill { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 3); background: var(--accent); clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); transition: transform 0.3s var(--ease), background 0.3s; }
 [data-mode="code"] .mode-switch .pill { transform: translateX(100%); }
+[data-mode="think"] .mode-switch .pill { transform: translateX(200%); }
+.mode-switch .pro-tag { font: 700 8.5px/1 var(--font-mono); letter-spacing: 0.06em; padding: 3px 4px 2px; border-radius: 3px; background: var(--think); color: #0a0a0a; font-style: normal; }
+[data-mode="think"] .mode-switch .pro-tag { background: #0a0a0a; color: var(--think); }
+body.is-pro .mode-switch .pro-tag { display: none; }
 .mode-switch svg { width: 14px; height: 14px; }
 
 .thread { flex: 1; overflow-y: auto; scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: var(--panel-3) transparent; }
@@ -262,4 +267,63 @@ body { overflow: hidden; }
   .composer-wrap { padding: 0 10px 10px; }
   .msg { grid-template-columns: minmax(0, 1fr); }
   .msg.assistant .who { display: none; }
+}
+
+/* ── Plans / Ehrler Pro ───────────────────────────── */
+.pro-badge { display: inline-block; margin-left: 7px; padding: 3px 5px 2px; border-radius: 4px; font: 700 9px/1 var(--font-mono); letter-spacing: 0.08em; font-style: normal; color: #0a0a0a; background: linear-gradient(120deg, var(--gold), var(--ember-2)); vertical-align: 2px; }
+.upsell { margin: 0 10px 10px; padding: 14px; border-radius: 12px; border: 1px solid rgba(255, 200, 92, 0.22); background: linear-gradient(160deg, rgba(255, 200, 92, 0.08), rgba(255, 90, 31, 0.04) 60%, transparent); display: grid; gap: 6px; }
+.upsell b { font: 700 13px/1.2 var(--font-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); }
+.upsell span { font-size: 12.5px; color: var(--text-2); line-height: 1.45; }
+.upsell .btn { margin-top: 6px; }
+
+.usage { background: none; border: 0; cursor: pointer; padding: 6px 4px; border-radius: 6px; }
+.usage:hover { background: var(--panel-2); color: var(--text); }
+.usage.warn .bar i { background: var(--gold); }
+.usage.out .bar i { background: var(--danger); }
+.usage.out { color: #ff9aa4; }
+
+.limit-banner { max-width: 840px; margin: 0 auto 10px; display: flex; align-items: center; gap: 14px; padding: 12px 12px 12px 16px; border-radius: 12px; background: linear-gradient(120deg, rgba(255, 200, 92, 0.1), rgba(255, 90, 31, 0.08)); border: 1px solid rgba(255, 200, 92, 0.3); animation: rise 0.3s var(--ease); }
+.limit-banner .lb-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.limit-banner b { font: 600 14px/1.3 var(--font-display); }
+.limit-banner span { font-size: 13px; color: var(--text-2); }
+.composer.locked { opacity: 0.55; pointer-events: none; }
+
+.modal-wide { width: min(720px, 100%); }
+.tiers { display: grid; grid-template-columns: 1fr 1.15fr; gap: 12px; }
+.tier { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 20px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--bg-2); }
+.tier-pro { border-color: rgba(255, 200, 92, 0.4); background: linear-gradient(170deg, rgba(255, 200, 92, 0.08), rgba(255, 90, 31, 0.05) 55%, var(--bg-2)); box-shadow: 0 20px 50px rgba(255, 140, 50, 0.08); }
+.tier-pro::before { content: ""; position: absolute; top: -1px; left: 20px; width: 70px; height: 3px; background: linear-gradient(90deg, var(--gold), var(--ember)); clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%); }
+.tier-name { font: 700 12px/1 var(--font-display); letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+.tier-pro .tier-name { color: var(--gold); }
+.tier-price { font: 700 30px/1 var(--font-display); }
+.tier ul { margin: 4px 0 6px; padding: 0; list-style: none; display: grid; align-content: start; gap: 9px; font-size: 13.5px; color: var(--text-2); flex: 1; }
+.tier li { position: relative; padding-left: 20px; }
+.tier li::before { content: ""; position: absolute; left: 0; top: 7px; width: 10px; height: 3px; background: var(--muted); transform: skewX(-35deg); }
+.tier-pro li::before { background: var(--gold); }
+.tier li b { color: var(--text); font-weight: 600; }
+.tier-current { font: 600 11px/1 var(--font-display); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); text-align: center; padding: 12px 0 2px; }
+.fine-print { font-size: 11.5px; color: var(--muted); text-align: center; }
+.tier-pro .btn-primary { background: linear-gradient(100deg, var(--gold), var(--ember-2)); }
+
+.plan-card { display: grid; gap: 12px; padding: 16px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--bg-2); }
+.plan-card .plan-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.plan-card .plan-name { font: 700 18px/1.2 var(--font-display); }
+.plan-card .plan-name.pro { background: linear-gradient(100deg, var(--gold), var(--ember-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.plan-card .meter-lg { height: 6px; border-radius: 3px; background: var(--panel-3); overflow: hidden; }
+.plan-card .meter-lg i { display: block; height: 100%; background: var(--accent); }
+.plan-card small { color: var(--muted); font-size: 12.5px; }
+
+/* Think mode: collapsible reasoning */
+.reasoning { margin: 0 0 14px; border: 1px solid var(--line-2); border-left: 3px solid var(--think); border-radius: 8px; background: rgba(178, 141, 255, 0.04); }
+.reasoning summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; padding: 9px 14px; font: 600 12px/1 var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--think); }
+.reasoning summary::-webkit-details-marker { display: none; }
+.reasoning summary::after { content: "+"; margin-left: auto; font: 500 14px/1 var(--font-mono); color: var(--muted); }
+.reasoning[open] summary::after { content: "–"; }
+.reasoning .thought { padding: 0 16px 12px; font-size: 13.5px; line-height: 1.6; color: var(--text-2); white-space: pre-wrap; max-height: 320px; overflow-y: auto; }
+.reasoning.live summary .spinner { width: 12px; height: 12px; border-width: 1.5px; }
+
+@media (max-width: 640px) {
+  .tiers { grid-template-columns: 1fr; }
+  .limit-banner { flex-direction: column; align-items: stretch; }
+  .mode-switch .pro-tag { display: none; }
 }
