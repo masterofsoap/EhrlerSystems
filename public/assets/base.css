@@ -18,6 +18,8 @@
   --ember-glow: rgba(255, 90, 31, 0.35);
   --signal: #3df5c2;
   --signal-glow: rgba(61, 245, 194, 0.3);
+  --think: #b28dff;
+  --gold: #ffc85c;
   --danger: #ff4d5e;
   --ok: #3df5c2;
   --accent: var(--ember);
@@ -31,6 +33,11 @@
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+[data-mode="think"] {
+  --accent: var(--think);
+  --accent-2: #d6c2ff;
+  --accent-glow: rgba(178, 141, 255, 0.3);
+}
 [data-mode="code"] {
   --accent: var(--signal);
   --accent-2: #9bffe3;
