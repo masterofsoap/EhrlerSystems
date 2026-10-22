@@ -13,7 +13,7 @@ binding = "AI"
 [[d1_databases]]
 binding = "DB"
 database_name = "ehrler-systems"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "1e23ee96-1e33-4f7a-901d-606682f99385"
 migrations_dir = "migrations"
 
 [vars]
