@@ -1,5 +1,6 @@
 // GET /api/oauth/userinfo  (Authorization: Bearer <access_token>)
 import { corsHeaders, getClient, oauthJson } from "../../../lib/oauth.js";
+import { getPlan } from "../../../lib/plans.js";
 import { now, sha256Hex } from "../../../lib/util.js";
 
 export async function onRequestOptions({ request, env }) {
@@ -25,7 +26,18 @@ export async function onRequestGet({ request, env }) {
   await env.DB.prepare("UPDATE oauth_grants SET last_used = ? WHERE user_id = ? AND client_id = ?").bind(now(), row.id, row.client_id).run();
 
   const scopes = row.scope.split(" ");
-  const info = { sub: row.id, name: row.name, created_at: row.created_at, issuer: "ehrler-systems" };
+  const plan = await getPlan(env, { id: row.id, email: row.email });
+  const info = {
+    sub: row.id,
+    name: row.name,
+    created_at: row.created_at,
+    issuer: "ehrler-systems",
+    // Ehrler Pro unlocks the Pro version of every Ehrler product.
+    plan: plan.plan,
+    pro: plan.pro,
+    pro_until: plan.pro_until,
+    entitlements: plan.pro ? ["pro"] : [],
+  };
   if (scopes.includes("email")) Object.assign(info, { email: row.email, email_verified: false });
   return oauthJson(info, 200, cors);
 }
