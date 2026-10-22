@@ -44,8 +44,18 @@ export const onRequestDelete = handler(async ({ request, env }) => {
     for (const s of subs) await stripe(env, "DELETE", `/subscriptions/${s.id}`);
   }
 
+  // Remove stored file contents (KV isn't covered by database cascades).
+  if (env.FILES) {
+    const { results: files } = await env.DB.prepare("SELECT id FROM files WHERE user_id = ?").bind(user.id).all();
+    for (const f of files) await env.FILES.delete(`file:${f.id}`);
+  }
+
   // D1 enforces foreign keys, so these cascade, but delete explicitly to be safe.
   await env.DB.batch([
+    env.DB.prepare("DELETE FROM files WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM connections WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM tasks WHERE user_id = ?").bind(user.id),
+    env.DB.prepare("DELETE FROM agent_runs WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM subscriptions WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM messages WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM conversations WHERE user_id = ?").bind(user.id),
