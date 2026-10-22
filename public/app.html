@@ -31,10 +31,15 @@
         </div>
       </div>
       <nav class="convos" id="convos"></nav>
+      <div class="upsell" id="upsell" hidden>
+        <b>Ehrler Pro</b>
+        <span>~20× the usage, Think mode, and Pro in every Ehrler app.</span>
+        <button class="btn btn-primary btn-sm btn-block" data-upgrade>Upgrade · <span class="price-label">$12/month</span></button>
+      </div>
       <div class="side-foot">
         <button class="user-chip" id="userChip" aria-label="Account settings">
           <span class="avatar" id="avatar">·</span>
-          <span class="who"><b id="userName">…</b><small id="userEmail"></small></span>
+          <span class="who"><b><span id="userName">…</span><i class="pro-badge" id="proBadge" hidden>PRO</i></b><small id="userEmail"></small></span>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--muted)"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
       </div>
@@ -56,6 +61,9 @@
           <button id="modeCode" aria-pressed="false" title="Code mode (Ctrl /)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg><span>Code</span>
           </button>
+          <button id="modeThink" aria-pressed="false" title="Think mode — for complex, multi-step tasks (Pro)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg><span>Think</span><i class="pro-tag" id="thinkTag">PRO</i>
+          </button>
         </div>
         <button class="icon-btn" id="toggleWb" title="Workbench (Ctrl B)" aria-label="Toggle Workbench">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16"/></svg>
@@ -67,12 +75,16 @@
       </div>
 
       <div class="composer-wrap">
+        <div class="limit-banner" id="limitBanner" hidden>
+          <div class="lb-text"><b id="lbTitle">You've used this month's free usage</b><span id="lbSub">Upgrade to Ehrler Pro to keep going, or wait until it resets.</span></div>
+          <button class="btn btn-primary btn-sm" id="lbUpgrade" data-upgrade>Upgrade to Pro</button>
+        </div>
         <form class="composer" id="composer">
           <textarea id="input" rows="1" placeholder="Message Ehrler Systems…" aria-label="Message"></textarea>
           <div class="composer-bar">
             <span class="hint" id="modelHint"></span>
             <span class="grow"></span>
-            <span class="usage" id="usage" title="Messages left today (resets at midnight UTC)"><span class="bar"><i id="usageBar"></i></span><span id="usageText">—</span></span>
+            <button type="button" class="usage" id="usage" title="Monthly usage"><span class="bar"><i id="usageBar"></i></span><span id="usageText">—</span></button>
             <button class="btn btn-primary send" id="sendBtn" type="submit" aria-label="Send">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
             </button>
@@ -140,6 +152,10 @@
       </div>
       <div class="modal-body">
         <section class="modal-section">
+          <h3>Plan</h3>
+          <div class="plan-card" id="planCard"></div>
+        </section>
+        <section class="modal-section">
           <h3>Profile</h3>
           <form id="profileForm">
             <div class="field"><label for="profName">Name</label><input class="input" id="profName" maxlength="60" required></div>
@@ -177,6 +193,44 @@
           <button class="btn btn-ghost" id="signOut">Sign out</button>
           <button class="btn btn-danger" id="deleteAccount">Delete account</button>
         </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upgrade modal -->
+  <div class="modal-scrim" id="upgradeModal" role="dialog" aria-modal="true" aria-labelledby="upgradeTitle">
+    <div class="modal modal-wide">
+      <div class="modal-head">
+        <h2 id="upgradeTitle">Upgrade to Ehrler Pro</h2>
+        <button class="icon-btn" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <p class="muted" id="upgradeReason" style="margin:0 0 18px"></p>
+        <div class="tiers">
+          <div class="tier">
+            <span class="tier-name">Free</span>
+            <div class="tier-price">$0</div>
+            <ul>
+              <li>Monthly usage allowance</li>
+              <li>Chat and Code modes</li>
+              <li>Workbench: run HTML, CSS &amp; JS</li>
+              <li>Sign in to Ehrler apps</li>
+            </ul>
+            <span class="tier-current" id="tierFreeCurrent">Current plan</span>
+          </div>
+          <div class="tier tier-pro">
+            <span class="tier-name">Ehrler Pro</span>
+            <div class="tier-price"><span class="price-label">$12/month</span></div>
+            <ul>
+              <li><b>About 20× the monthly usage</b></li>
+              <li><b>Think mode</b> for complex, multi-step tasks</li>
+              <li>Longer answers and longer conversation memory</li>
+              <li><b>Pro in every Ehrler product</b>, including GoVariety</li>
+            </ul>
+            <button class="btn btn-primary btn-block" id="checkoutBtn">Upgrade to Pro</button>
+            <span class="fine-print">Billed monthly through Stripe. Cancel anytime.</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
