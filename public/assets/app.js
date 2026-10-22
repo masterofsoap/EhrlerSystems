@@ -1,4 +1,4 @@
-import { api, esc, toast } from "./common.js";
+import { api, esc, setBusy, toast } from "./common.js";
 import { extensionFor, highlight, normalizeLang, renderMarkdown, RUNNABLE } from "./markdown.js";
 
 const $ = (id) => document.getElementById(id);
@@ -26,6 +26,12 @@ const SUGGESTIONS = {
     ["Write SQL", "Write a SQLite schema for a hockey league: teams, players, games and scores, plus a standings query."],
     ["Explain code", "Explain async/await in JavaScript with a runnable example that logs each step."],
   ],
+  think: [
+    ["Plan a launch", "I'm launching a $12/month subscription for my apps. Work out a 30-day launch plan with milestones and risks."],
+    ["Solve it step by step", "A league has 10 teams. Each plays every other team twice. How many games, and how would you schedule them over 9 weeks?"],
+    ["Debug the logic", "My standings show a team with more wins ranked below one with fewer. List every likely cause and how to check each."],
+    ["Weigh a decision", "Should I build my app as one big site or several small ones that share a login? Reason through the trade-offs."],
+  ],
 };
 
 const state = {
@@ -45,17 +51,23 @@ async function boot() {
   try {
     const me = await api("/api/auth/me");
     state.user = me.user;
-    state.usage = me.usage;
+    state.account = me.account;
     state.models = me.models || {};
   } catch {
     location.replace("/?next=" + encodeURIComponent(location.pathname + location.search));
     return;
   }
   renderUser();
-  renderUsage();
-  try { setMode(localStorage.getItem("es-mode") === "code" ? "code" : "chat", false); } catch { setMode("chat", false); }
+  renderAccount();
+  let saved = "chat";
+  try { saved = localStorage.getItem("es-mode") || "chat"; } catch {}
+  setMode(["chat", "code", "think"].includes(saved) && canUse(saved) ? saved : "chat", false);
   await loadConversations();
-  const c = new URLSearchParams(location.search).get("c");
+  const params = new URLSearchParams(location.search);
+  if (params.get("upgraded")) finishUpgrade();
+  if (params.get("upgrade")) { history.replaceState(null, "", "/app"); openUpgrade(); }
+  if (params.get("billing") === "cancelled") { toast("Checkout cancelled — you're still on Free."); history.replaceState(null, "", "/app"); }
+  const c = params.get("c");
   if (c) openConversation(c);
   else showEmpty();
   $("input").focus();
@@ -68,29 +80,65 @@ function renderUser() {
   $("avatar").textContent = (u.name || u.email).trim().charAt(0).toUpperCase();
 }
 
-function renderUsage() {
-  const u = state.usage;
-  if (!u) return;
-  $("usageText").textContent = `${u.remaining}/${u.limit}`;
-  $("usageBar").style.width = `${(u.remaining / Math.max(1, u.limit)) * 100}%`;
-  $("usage").title = `${u.remaining} of ${u.limit} messages left today (resets at midnight UTC)`;
+const fmtDate = (ms) => new Date(ms).toLocaleDateString(undefined, { month: "long", day: "numeric", timeZone: "UTC" });
+const isPro = () => !!state.account?.pro;
+const canUse = (mode) => (state.account?.modes || ["chat", "code"]).includes(mode);
+
+// Plan, usage meter, Pro badges and the out-of-usage banner.
+function renderAccount() {
+  const a = state.account;
+  if (!a) return;
+  const u = a.usage;
+  document.body.classList.toggle("is-pro", a.pro);
+  $("proBadge").hidden = !a.pro;
+  $("upsell").hidden = a.pro || !a.billing_enabled;
+  document.querySelectorAll(".price-label").forEach((el) => (el.textContent = a.pro_price));
+
+  const pct = Math.min(100, u.percent);
+  const meter = $("usage");
+  meter.classList.toggle("warn", pct >= 80 && pct < 100);
+  meter.classList.toggle("out", u.remaining <= 0);
+  $("usageText").textContent = u.remaining <= 0 ? "0% left" : `${Math.max(0, Math.round(100 - pct))}% left`;
+  $("usageBar").style.width = `${Math.max(0, 100 - pct)}%`;
+  meter.title = `${a.pro ? "Ehrler Pro" : "Free"} plan · ${Math.round(pct)}% of this month's usage used · resets ${fmtDate(u.resets_at)}`;
+
+  const out = u.remaining <= 0;
+  $("limitBanner").hidden = !out;
+  $("composer").classList.toggle("locked", out);
+  if (out) {
+    $("lbTitle").textContent = a.pro ? "You've used all of this month's Pro usage" : "You've used this month's free usage";
+    $("lbSub").textContent = a.pro
+      ? `It resets on ${fmtDate(u.resets_at)}.`
+      : `Upgrade to Ehrler Pro to keep going, or wait until it resets on ${fmtDate(u.resets_at)}.`;
+    $("lbUpgrade").hidden = a.pro || !a.billing_enabled;
+  }
 }
 
 /* ───────────────────────── Mode ───────────────────────── */
 
+const PLACEHOLDER = {
+  chat: "Message Ehrler Systems…",
+  code: "Describe what to build, paste code, or ask about a bug…",
+  think: "Give it a hard problem — it will reason step by step…",
+};
+
 function setMode(mode, persist = true) {
+  if (!canUse(mode)) {
+    openUpgrade("Think mode is part of Ehrler Pro. It reasons step by step through complex, multi-step tasks.");
+    return;
+  }
   state.mode = mode;
   root.dataset.mode = mode;
-  $("modeChat").setAttribute("aria-pressed", mode === "chat");
-  $("modeCode").setAttribute("aria-pressed", mode === "code");
-  $("input").placeholder = mode === "code" ? "Describe what to build, paste code, or ask about a bug…" : "Message Ehrler Systems…";
-  const model = (mode === "code" ? state.models.code : state.models.chat) || "";
+  for (const m of ["chat", "code", "think"]) $("mode" + m[0].toUpperCase() + m.slice(1)).setAttribute("aria-pressed", mode === m);
+  $("input").placeholder = PLACEHOLDER[mode];
+  const model = state.models[mode] || "";
   $("modelHint").textContent = model ? model.split("/").pop() : "";
   if (persist) try { localStorage.setItem("es-mode", mode); } catch {}
   if (!state.currentId) showEmpty();
 }
 $("modeChat").onclick = () => setMode("chat");
 $("modeCode").onclick = () => setMode("code");
+$("modeThink").onclick = () => setMode("think");
 
 /* ───────────────────────── Conversations ───────────────────────── */
 
@@ -136,7 +184,8 @@ function renderConversations() {
     el.dataset.id = c.id;
     el.setAttribute("role", "button");
     el.tabIndex = 0;
-    el.innerHTML = `<span class="tag ${c.mode === "code" ? "code" : ""}">${c.mode === "code" ? "&lt;/&gt;" : "AI"}</span><span class="title">${esc(c.title)}</span><button class="icon-btn more" aria-label="More options">${ICON.dots}</button>`;
+    const tag = { code: "&lt;/&gt;", think: "∴" }[c.mode] || "AI";
+    el.innerHTML = `<span class="tag ${c.mode}">${tag}</span><span class="title">${esc(c.title)}</span><button class="icon-btn more" aria-label="More options">${ICON.dots}</button>`;
     el.onclick = (e) => {
       if (e.target.closest(".more")) return openConvoMenu(e, c);
       openConversation(c.id);
@@ -223,7 +272,8 @@ async function openConversation(id) {
     history.replaceState(null, "", `/app?c=${id}`);
     $("convTitle").textContent = data.conversation.title;
     document.title = `${data.conversation.title} · Ehrler Systems`;
-    setMode(data.conversation.mode === "code" ? "code" : "chat", false);
+    const m = data.conversation.mode;
+    setMode(["code", "think"].includes(m) && canUse(m) ? m : "chat", false);
     const inner = $("threadInner");
     inner.innerHTML = "";
     for (const m of data.messages) addMessage(m.role, m.content, { model: m.model, animate: false });
@@ -255,14 +305,16 @@ function showEmpty() {
   const hour = new Date().getHours();
   const greet = hour < 5 ? "Burning the midnight oil" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   const first = (state.user?.name || "").split(" ")[0];
-  const code = state.mode === "code";
+  const intro = {
+    chat: "Ask anything. Switch to Code mode for a model tuned for programming, or Think mode for hard, multi-step problems.",
+    code: "Code mode is on. Ask for anything from a quick fix to a full page — HTML, CSS and JavaScript run live in the Workbench.",
+    think: "Think mode is on. It reasons step by step before answering — best for planning, math, debugging and tricky decisions.",
+  }[state.mode];
   $("threadInner").innerHTML = `
     <div class="empty">
       <div class="mark"><img class="logo" src="/assets/logo.png" alt=""></div>
       <h2>${esc(greet)}${first ? `, <em>${esc(first)}</em>` : ""}.</h2>
-      <p>${code
-        ? "Code mode is on. Ask for anything from a quick fix to a full page — HTML, CSS and JavaScript run live in the Workbench."
-        : "Ask anything. Switch to Code mode for a model tuned for programming."}</p>
+      <p>${intro}</p>
       <div class="suggestions">${SUGGESTIONS[state.mode].map(([t, p]) => `<button class="suggestion" data-p="${esc(p)}"><b>${esc(t)}</b>${esc(p)}</button>`).join("")}</div>
     </div>`;
   $("threadInner").querySelectorAll(".suggestion").forEach((b) => (b.onclick = () => { $("input").value = b.dataset.p; autosize(); send(); }));
@@ -296,16 +348,42 @@ function renderAssistant(el, content, streaming) {
     prose.innerHTML = '<div class="thinking" aria-label="Thinking"><i></i><i></i><i></i></div>';
     return;
   }
-  const { html, blocks } = renderMarkdown(content);
-  prose.innerHTML = html;
+  // Think mode: show the model's reasoning in a collapsible panel above the answer.
+  const think = el._think || content.includes("</think>") ? splitThinking(content, streaming) : null;
+  const answer = think ? think.answer : content;
+  let pre = "";
+  if (think && think.thought) {
+    // Open while thinking; collapsed once the answer starts, unless the reader opened it.
+    const open = think.done ? !!el._reasonOpen : true;
+    pre = `<details class="reasoning${think.done ? "" : " live"}"${open ? " open" : ""}><summary>${think.done ? "Reasoning" : '<span class="spinner"></span>Thinking…'}</summary><div class="thought"></div></details>`;
+  }
+  const { html, blocks } = renderMarkdown(answer);
+  prose.innerHTML = pre + html;
+  if (pre) {
+    const t = prose.querySelector(".thought");
+    t.textContent = think.thought;
+    if (!think.done) t.scrollTop = t.scrollHeight;
+    else prose.querySelector("details.reasoning").addEventListener("toggle", (e) => (el._reasonOpen = e.target.open));
+  }
   el._blocks = blocks;
   const lastBlockOpen = blocks.length && blocks[blocks.length - 1].open;
-  if (streaming && !lastBlockOpen) {
+  if (streaming && !lastBlockOpen && !(think && !think.done)) {
     const target = prose.lastElementChild && /^(P|LI|UL|OL|H\d|BLOCKQUOTE)$/.test(prose.lastElementChild.tagName)
       ? deepestLast(prose.lastElementChild) : prose;
     target.insertAdjacentHTML("beforeend", '<span class="caret"></span>');
   }
 }
+function splitThinking(content, live) {
+  const s = content.replace(/^\s*<think>\s*/, "");
+  const end = s.indexOf("</think>");
+  if (end !== -1) return { thought: s.slice(0, end).trim(), answer: s.slice(end + 8).replace(/^\s+/, ""), done: true };
+  if (live) return { thought: s.trim(), answer: "", done: false };
+  return { thought: "", answer: content, done: true };
+}
+const answerOnly = (content) => {
+  const end = content.lastIndexOf("</think>");
+  return end === -1 ? content : content.slice(end + 8).trim();
+};
 function deepestLast(node) {
   while (node.lastElementChild && /^(UL|OL|LI|P|BLOCKQUOTE)$/.test(node.lastElementChild.tagName)) node = node.lastElementChild;
   return node;
@@ -336,7 +414,7 @@ $("thread").addEventListener("click", async (e) => {
   const msg = btn.closest(".msg");
   const act = btn.dataset.act;
   if (act === "copy-msg") {
-    await copyText(msg._content || "");
+    await copyText(answerOnly(msg._content || ""));
     flash(btn);
     return;
   }
@@ -399,11 +477,17 @@ function stopStreaming() {
 async function send() {
   const text = input.value.trim();
   if (!text || state.streaming) return;
+  if (state.account && state.account.usage.remaining <= 0) {
+    renderAccount();
+    if (!isPro()) openUpgrade("You've used this month's free usage. Ehrler Pro gives you about 20× more every month.");
+    return;
+  }
   input.value = "";
   autosize();
 
-  addMessage("user", text);
-  const el = addMessage("assistant", "", { model: state.mode === "code" ? state.models.code : state.models.chat });
+  const userEl = addMessage("user", text);
+  const el = addMessage("assistant", "", { model: state.models[state.mode] });
+  el._think = state.mode === "think";
   renderAssistant(el, "", true);
   markLast();
   scrollToBottom(true);
@@ -413,7 +497,7 @@ async function send() {
   setSending(true);
   let content = "";
   let raf = 0;
-  let gotUsage = false;
+  let gotAccount = false;
   const paint = () => { raf = 0; renderAssistant(el, content, true); scrollToBottom(); };
 
   try {
@@ -426,6 +510,19 @@ async function send() {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       if (res.status === 401) return location.replace("/?next=/app");
+      if (data.error === "usage_exhausted" || data.error === "pro_required") {
+        // Undo the optimistic messages and put the text back.
+        el.remove();
+        userEl.remove();
+        input.value = text;
+        autosize();
+        if (!$("threadInner").querySelector(".msg")) showEmpty();
+        await refreshAccount();
+        gotAccount = true;
+        if (!isPro()) openUpgrade(data.message);
+        else toast(data.message, "error");
+        return;
+      }
       throw new Error(data.message || `Request failed (${res.status})`);
     }
     const reader = res.body.getReader();
@@ -443,8 +540,10 @@ async function send() {
         const ev = JSON.parse(line);
         if (ev.t === "meta") onMeta(ev);
         else if (ev.t === "delta") { content += ev.v; el._content = content; if (!raf) raf = requestAnimationFrame(paint); }
-        else if (ev.t === "done") { if (ev.usage) { state.usage = ev.usage; renderUsage(); gotUsage = true; } }
-        else if (ev.t === "error") showMsgError(el, ev.message);
+        else if (ev.t === "done" || ev.t === "error") {
+          if (ev.account) { state.account = ev.account; renderAccount(); gotAccount = true; }
+          if (ev.t === "error") showMsgError(el, ev.message);
+        }
       }
     }
   } catch (e) {
@@ -461,7 +560,7 @@ async function send() {
     state.streaming = null;
     setSending(false);
     markLast();
-    if (!gotUsage) refreshUsage();
+    if (!gotAccount) refreshAccount();
     bumpConversation();
   }
 }
@@ -486,8 +585,8 @@ function bumpConversation() {
   renderConversations();
 }
 
-async function refreshUsage() {
-  try { const me = await api("/api/auth/me"); state.usage = me.usage; renderUsage(); } catch {}
+async function refreshAccount() {
+  try { const me = await api("/api/auth/me"); state.account = me.account; renderAccount(); } catch {}
 }
 
 function showMsgError(el, message) {
@@ -660,8 +759,101 @@ async function openAccount() {
   closeSidebar();
   $("profName").value = state.user.name;
   $("profEmail").value = state.user.email;
+  renderPlanCard();
   modal.classList.add("open");
   loadApps();
+}
+
+function renderPlanCard() {
+  const a = state.account;
+  const u = a.usage;
+  const card = $("planCard");
+  const used = Math.round(Math.min(100, u.percent));
+  let status = "";
+  if (a.pro && a.status === "complimentary") status = "Complimentary Pro";
+  else if (a.pro && a.cancel_at_period_end && a.pro_until) status = `Ends ${fmtDate(a.pro_until)}`;
+  else if (a.pro && a.status === "past_due") status = "Payment failed — update your card";
+  else if (a.pro && a.pro_until) status = `Renews ${fmtDate(a.pro_until)}`;
+  card.innerHTML = `
+    <div class="plan-row"><span class="plan-name ${a.pro ? "pro" : ""}">${a.pro ? "Ehrler Pro" : "Free"}</span><small>${esc(status)}</small></div>
+    <div class="meter-lg"><i style="width:${used}%"></i></div>
+    <small>${used}% of this month's usage used · resets ${fmtDate(u.resets_at)}</small>
+    <div class="plan-row"></div>`;
+  const row = card.lastElementChild;
+  if (a.pro && a.status !== "complimentary") {
+    const b = document.createElement("button");
+    b.className = "btn btn-ghost btn-sm";
+    b.textContent = "Manage billing";
+    b.onclick = () => openPortal(b);
+    row.append(b);
+  } else if (!a.pro && a.billing_enabled) {
+    const b = document.createElement("button");
+    b.className = "btn btn-primary btn-sm";
+    b.textContent = `Upgrade to Pro · ${a.pro_price}`;
+    b.onclick = () => { modal.classList.remove("open"); openUpgrade(); };
+    row.append(b);
+  }
+  if (a.pro) {
+    const note = document.createElement("small");
+    note.textContent = "Pro is active in every Ehrler app you sign into.";
+    row.append(note);
+  }
+}
+
+/* ───────────────────────── Ehrler Pro ───────────────────────── */
+
+const upgradeModal = $("upgradeModal");
+upgradeModal.addEventListener("click", (e) => { if (e.target === upgradeModal || e.target.closest("[data-close]")) upgradeModal.classList.remove("open"); });
+document.addEventListener("click", (e) => { if (e.target.closest("[data-upgrade]")) openUpgrade(); });
+$("usage").onclick = () => (isPro() ? openAccount() : openUpgrade());
+
+function openUpgrade(reason) {
+  const a = state.account;
+  if (a?.pro) { openAccount(); return; }
+  if (a && !a.billing_enabled) { toast("Ehrler Pro isn't available yet.", "error"); return; }
+  $("upgradeReason").textContent = reason || "One subscription. The Pro version of every Ehrler product.";
+  closeSidebar();
+  upgradeModal.classList.add("open");
+}
+
+$("checkoutBtn").onclick = async () => {
+  const b = $("checkoutBtn");
+  setBusy(b, true, "Opening checkout");
+  try {
+    const { url } = await api("/api/billing/checkout", { method: "POST", body: {} });
+    location.assign(url);
+  } catch (e) {
+    setBusy(b, false);
+    if (e.code === "already_pro") { await refreshAccount(); upgradeModal.classList.remove("open"); toast("You already have Ehrler Pro."); }
+    else toast(e.message, "error");
+  }
+};
+
+async function openPortal(btn) {
+  setBusy(btn, true);
+  try {
+    const { url } = await api("/api/billing/portal", { method: "POST", body: {} });
+    location.assign(url);
+  } catch (e) {
+    setBusy(btn, false);
+    toast(e.message, "error");
+  }
+}
+
+// Back from Stripe Checkout: confirm the subscription (the webhook may be a moment behind).
+async function finishUpgrade() {
+  history.replaceState(null, "", "/app");
+  toast("Activating Ehrler Pro…");
+  for (let i = 0; i < 8; i++) {
+    try {
+      const { account } = await api("/api/billing/sync", { method: "POST", body: {} });
+      state.account = account;
+      renderAccount();
+      if (account.pro) { toast("Welcome to Ehrler Pro. Think mode and Pro usage are unlocked."); return; }
+    } catch {}
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  toast("Payment received — Pro may take a minute to appear. Refresh shortly.", "error");
 }
 
 async function loadApps() {
@@ -732,6 +924,7 @@ document.addEventListener("keydown", (e) => {
   else if (mod && e.key.toLowerCase() === "b") { e.preventDefault(); toggleWorkbench(); }
   else if (e.key === "Escape") {
     if (state.streaming) stopStreaming();
+    else if (upgradeModal.classList.contains("open")) upgradeModal.classList.remove("open");
     else if (modal.classList.contains("open")) modal.classList.remove("open");
     else if ($("sidebar").classList.contains("open")) closeSidebar();
     else if ($("workbench").classList.contains("open") && innerWidth <= 980) toggleWorkbench(false);
