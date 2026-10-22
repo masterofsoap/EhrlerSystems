@@ -1,5 +1,6 @@
 import { api, esc, setBusy, toast } from "./common.js";
 import { extensionFor, highlight, normalizeLang, renderMarkdown, RUNNABLE } from "./markdown.js";
+import { addPart, ensureAgentSlots, fileChipHtml, renderParts, runCode, setApprovalStatus, setCodeStatus, uploadFile } from "./agent-ui.js";
 
 const $ = (id) => document.getElementById(id);
 const root = document.documentElement;
@@ -15,10 +16,10 @@ const ICON = {
 
 const SUGGESTIONS = {
   chat: [
-    ["Explain it simply", "How does a heat pump work, and is it worth it in a cold climate?"],
-    ["Plan something", "Plan a 3-day weekend trip on a $400 budget with a packing list."],
-    ["Write for me", "Write a friendly but firm email asking a client to pay an overdue invoice."],
-    ["Think it through", "Help me decide between two job offers. Ask me questions first."],
+    ["Make an ad", "Create a bold Instagram ad for a neighborhood coffee shop called Ember Roast: moody lighting, latte art, the headline \"Wake Up Warm\". Square format."],
+    ["Read a page", "Read https://developers.cloudflare.com/workers-ai/ and give me the 5 most useful things it can do, in plain English."],
+    ["Plan my day", "What's on my calendar today and what unread emails need a reply? Draft the replies for me to review."],
+    ["Every morning", "Every weekday at 7:30am, summarize my unread email and today's calendar and email me the summary."],
   ],
   code: [
     ["Build a UI", "Build a single-file HTML page with a glowing, animated countdown timer I can start and pause."],
@@ -43,6 +44,8 @@ const state = {
   mode: "chat",
   streaming: null, // AbortController while a reply streams
   search: "",
+  attachments: [], // {id?, name, mime, url, uploading, progress, error, local}
+  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
 };
 
 /* ───────────────────────── Boot ───────────────────────── */
@@ -67,6 +70,12 @@ async function boot() {
   if (params.get("upgraded")) finishUpgrade();
   if (params.get("upgrade")) { history.replaceState(null, "", "/app"); openUpgrade(); }
   if (params.get("billing") === "cancelled") { toast("Checkout cancelled — you're still on Free."); history.replaceState(null, "", "/app"); }
+  if (params.get("connected")) { toast(`${params.get("connected") === "google" ? "Google" : "GitHub"} connected.`); history.replaceState(null, "", "/app"); openAccount("connections"); }
+  if (params.get("connect_error")) {
+    const why = { not_configured: "That connection isn't set up on this site yet.", cancelled: "Connection cancelled.", bad_state: "That link expired — try again." }[params.get("connect_error")] || "Couldn't connect that account. Try again.";
+    toast(why, "error");
+    history.replaceState(null, "", "/app");
+  }
   const c = params.get("c");
   if (c) openConversation(c);
   else showEmpty();
@@ -276,7 +285,12 @@ async function openConversation(id) {
     setMode(["code", "think"].includes(m) && canUse(m) ? m : "chat", false);
     const inner = $("threadInner");
     inner.innerHTML = "";
-    for (const m of data.messages) addMessage(m.role, m.content, { model: m.model, animate: false });
+    for (const m of data.messages) {
+      let parts = null;
+      try { parts = m.parts ? JSON.parse(m.parts) : null; } catch {}
+      if (m.role === "assistant" && !m.content && !parts?.length) continue;
+      addMessage(m.role, m.content, { model: m.model, animate: false, parts });
+    }
     markLast();
     renderConversations();
     scrollToBottom(true);
@@ -322,7 +336,7 @@ function showEmpty() {
 
 /* ───────────────────────── Messages ───────────────────────── */
 
-function addMessage(role, content, { model, animate = true } = {}) {
+function addMessage(role, content, { model, animate = true, parts = null } = {}) {
   const inner = $("threadInner");
   inner.querySelector(".empty")?.remove();
   const el = document.createElement("div");
@@ -331,6 +345,14 @@ function addMessage(role, content, { model, animate = true } = {}) {
   if (role === "user") {
     el.innerHTML = `<div class="who"></div><div><div class="bubble"></div><div class="meta" style="justify-content:flex-end"><button data-act="copy-msg">${ICON.copy}Copy</button></div></div>`;
     el.querySelector(".bubble").textContent = content;
+    const files = (parts || []).filter((p) => p.type === "file");
+    if (files.length) {
+      const strip = document.createElement("div");
+      strip.className = "bubble-files";
+      strip.innerHTML = files.map((f) => `<a class="file-chip" href="${esc(f.url)}" target="_blank" rel="noopener">${fileChipHtml(f)}</a>`).join("");
+      el.querySelector(".bubble").before(strip);
+      if (content === "(attached files)") el.querySelector(".bubble").remove();
+    }
   } else {
     el.innerHTML = `<div class="who"><img class="logo" src="/assets/logo.png" alt="Ehrler Systems"></div>
       <div><div class="prose"></div><div class="meta"><button data-act="copy-msg">${ICON.copy}Copy</button><span class="model"></span></div></div>`;
@@ -338,7 +360,10 @@ function addMessage(role, content, { model, animate = true } = {}) {
   }
   el._content = content;
   inner.append(el);
-  if (role === "assistant") renderAssistant(el, content, false);
+  if (role === "assistant") {
+    if (parts?.length) renderParts(el, parts, agentHandlers(el));
+    renderAssistant(el, content, false);
+  }
   return el;
 }
 
@@ -476,58 +501,69 @@ function stopStreaming() {
 
 async function send() {
   const text = input.value.trim();
-  if (!text || state.streaming) return;
+  const ready = state.attachments.filter((a) => a.id && !a.error);
+  if ((!text && !ready.length) || state.streaming) return;
+  if (state.attachments.some((a) => a.uploading)) { toast("Wait for the upload to finish."); return; }
   if (state.account && state.account.usage.remaining <= 0) {
     renderAccount();
     if (!isPro()) openUpgrade("You've used this month's free usage. Ehrler Pro gives you about 20× more every month.");
     return;
   }
+  const sentAttachments = ready.map((a) => ({ type: "file", file_id: a.id, name: a.name, mime: a.mime, url: a.url }));
   input.value = "";
   autosize();
+  clearAttachments();
 
-  const userEl = addMessage("user", text);
+  const userEl = addMessage("user", text || "(attached files)", { parts: sentAttachments });
   const el = addMessage("assistant", "", { model: state.models[state.mode] });
   el._think = state.mode === "think";
   renderAssistant(el, "", true);
   markLast();
   scrollToBottom(true);
 
-  const ctrl = new AbortController();
-  state.streaming = ctrl;
-  setSending(true);
-  let content = "";
-  let raf = 0;
-  let gotAccount = false;
-  const paint = () => { raf = 0; renderAssistant(el, content, true); scrollToBottom(); };
-
-  try {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ conversation_id: state.currentId, message: text, mode: state.mode }),
-      signal: ctrl.signal,
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 401) return location.replace("/?next=/app");
+  const body = { conversation_id: state.currentId, message: text, mode: state.mode, attachments: sentAttachments.map((a) => a.file_id), timezone: state.timezone };
+  await streamInto("/api/chat", body, el, {
+    onRejected: async (data) => {
       if (data.error === "usage_exhausted" || data.error === "pro_required") {
-        // Undo the optimistic messages and put the text back.
         el.remove();
         userEl.remove();
         input.value = text;
         autosize();
         if (!$("threadInner").querySelector(".msg")) showEmpty();
         await refreshAccount();
-        gotAccount = true;
         if (!isPro()) openUpgrade(data.message);
         else toast(data.message, "error");
-        return;
+        return true;
       }
+      return false;
+    },
+  });
+}
+
+// POSTs and consumes an NDJSON stream into an assistant message element.
+async function streamInto(url, body, el, { onRejected } = {}) {
+  const ctrl = new AbortController();
+  state.streaming = ctrl;
+  setSending(true);
+  let content = el._content || "";
+  let raf = 0;
+  let gotAccount = false;
+  let paused = false;
+  const paint = () => { raf = 0; renderAssistant(el, content, true); scrollToBottom(); };
+  const handlers = agentHandlers(el);
+
+  try {
+    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) return location.replace("/?next=/app");
+      if (onRejected && (await onRejected(data))) { gotAccount = true; return; }
       throw new Error(data.message || `Request failed (${res.status})`);
     }
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let buf = "";
+    const clientJobs = [];
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
@@ -540,15 +576,33 @@ async function send() {
         const ev = JSON.parse(line);
         if (ev.t === "meta") onMeta(ev);
         else if (ev.t === "delta") { content += ev.v; el._content = content; if (!raf) raf = requestAnimationFrame(paint); }
-        else if (ev.t === "done" || ev.t === "error") {
+        else if (ev.t === "tool") { addPart(el, { type: "tool", ...ev }, handlers); scrollToBottom(); }
+        else if (ev.t === "part") { addPart(el, ev.part, handlers); scrollToBottom(); }
+        else if (ev.t === "approval") {
+          paused = true;
+          addPart(el, { type: "approval", run_id: ev.run_id, call_id: ev.call_id, name: ev.name, label: ev.label, preview: ev.preview, status: "pending" }, handlers);
+          scrollToBottom(true);
+        } else if (ev.t === "client_tool") {
+          paused = true;
+          const part = { type: "client_tool", run_id: ev.run_id, call_id: ev.call_id, name: ev.name, label: ev.label, args: ev.args, status: "running" };
+          const card = addPart(el, part, handlers);
+          clientJobs.push(() => handlers.onRunClientTool(part, card || el.querySelector(`.code-run[data-call="${CSS.escape(ev.call_id)}"]`)));
+          scrollToBottom(true);
+        } else if (ev.t === "resolved") {
+          const card = el.querySelector(`.approval[data-call="${CSS.escape(ev.call_id)}"]`);
+          if (card) setApprovalStatus(card, { status: ev.status }, handlers);
+        } else if (ev.t === "done" || ev.t === "error") {
           if (ev.account) { state.account = ev.account; renderAccount(); gotAccount = true; }
           if (ev.t === "error") showMsgError(el, ev.message);
         }
       }
     }
+    if (paused && !content) el.querySelector(".prose").innerHTML = "";
+    // Code the agent asked the browser to run: run it after the stream closes.
+    for (const job of clientJobs) setTimeout(job, 0);
   } catch (e) {
     if (e.name === "AbortError") {
-      if (!content) el.remove();
+      if (!content && !el.querySelector(".activity")?.children.length) el.remove();
       else el.querySelector(".prose").insertAdjacentHTML("afterend", `<div class="muted" style="margin-top:8px;font-size:12px">Stopped.</div>`);
     } else {
       if (!content) el.querySelector(".prose").innerHTML = "";
@@ -564,6 +618,94 @@ async function send() {
     bumpConversation();
   }
 }
+
+// Callbacks for interactive parts of an assistant message.
+function agentHandlers(el) {
+  return {
+    onDecision: async (runId, callId, decision, card) => {
+      if (state.streaming) { toast("Wait for the current reply to finish."); return false; }
+      setApprovalStatus(card, { status: decision === "approve" ? "approved" : "declined" });
+      el.querySelector(".prose").innerHTML = '<div class="thinking" aria-label="Working"><i></i><i></i><i></i></div>';
+      await streamInto("/api/chat/resume", { run_id: runId, call_id: callId, decision }, el);
+    },
+    onRunClientTool: async (part, card) => {
+      if (card) setCodeStatus(card, { ...part, status: "running" });
+      el.querySelector(".prose").innerHTML = '<div class="thinking" aria-label="Working"><i></i><i></i><i></i></div>';
+      const result = await runCode(part.args || {});
+      if (card) setCodeStatus(card, { ...part, status: result.error ? "error" : "done", output: result.stdout + (result.value ? `\n→ ${result.value}` : ""), error: result.error });
+      while (state.streaming) await new Promise((r) => setTimeout(r, 100));
+      await streamInto("/api/chat/resume", { run_id: part.run_id, call_id: part.call_id, result }, el);
+    },
+    onEditImage: (p) => {
+      addExistingAttachment({ id: p.file_id, name: p.name, mime: "image/png", url: p.url });
+      if (state.mode === "think") setMode("chat");
+      input.value = input.value || "Edit this image: ";
+      autosize();
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    },
+  };
+}
+
+/* ───────────────────────── Attachments ───────────────────────── */
+
+const fileInput = document.createElement("input");
+fileInput.type = "file";
+fileInput.multiple = true;
+fileInput.hidden = true;
+document.body.append(fileInput);
+$("attachBtn").onclick = () => fileInput.click();
+fileInput.onchange = () => { addFiles([...fileInput.files]); fileInput.value = ""; };
+
+function addFiles(files) {
+  for (const file of files.slice(0, 10)) {
+    if (state.attachments.length >= 10) { toast("Up to 10 files per message."); break; }
+    if (file.size > 20 * 1024 * 1024) { toast(`${file.name} is over 20 MB.`, "error"); continue; }
+    const a = { name: file.name || "pasted-image.png", mime: file.type || "application/octet-stream", uploading: true, progress: 0, local: /^image\//.test(file.type) ? URL.createObjectURL(file) : null };
+    state.attachments.push(a);
+    renderAttachments();
+    uploadFile(file, (p) => { a.progress = p; renderAttachments(); })
+      .then((f) => { Object.assign(a, { id: f.id, url: f.url, mime: f.mime, uploading: false }); renderAttachments(); })
+      .catch((e) => { a.uploading = false; a.error = e.message; renderAttachments(); toast(e.message, "error"); });
+  }
+}
+function addExistingAttachment(f) {
+  if (state.attachments.some((a) => a.id === f.id)) return;
+  state.attachments.push({ ...f, uploading: false });
+  renderAttachments();
+}
+function clearAttachments() {
+  state.attachments.forEach((a) => a.local && URL.revokeObjectURL(a.local));
+  state.attachments = [];
+  renderAttachments();
+}
+function renderAttachments() {
+  const box = $("attachments");
+  box.hidden = !state.attachments.length;
+  box.innerHTML = "";
+  state.attachments.forEach((a, i) => {
+    const chip = document.createElement("div");
+    chip.className = `file-chip${a.error ? " err" : ""}${a.uploading ? " busy" : ""}`;
+    chip.innerHTML = fileChipHtml({ ...a, url: a.local || a.url || "" }) +
+      (a.uploading ? `<span class="fc-progress"><i style="width:${Math.round((a.progress || 0) * 100)}%"></i></span>` : "") +
+      `<button type="button" class="fc-x" aria-label="Remove">✕</button>`;
+    chip.querySelector(".fc-x").onclick = () => { if (a.local) URL.revokeObjectURL(a.local); state.attachments.splice(i, 1); renderAttachments(); };
+    box.append(chip);
+  });
+}
+input.addEventListener("paste", (e) => {
+  const files = [...(e.clipboardData?.files || [])];
+  if (files.length) { e.preventDefault(); addFiles(files); }
+});
+const dropZone = document.querySelector(".main");
+dropZone.addEventListener("dragover", (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) { e.preventDefault(); dropZone.classList.add("dropping"); } });
+dropZone.addEventListener("dragleave", (e) => { if (e.target === dropZone || !dropZone.contains(e.relatedTarget)) dropZone.classList.remove("dropping"); });
+dropZone.addEventListener("drop", (e) => {
+  if (!e.dataTransfer?.files?.length) return;
+  e.preventDefault();
+  dropZone.classList.remove("dropping");
+  addFiles([...e.dataTransfer.files]);
+});
 
 function onMeta(ev) {
   if (!state.currentId) {
@@ -755,13 +897,99 @@ const modal = $("accountModal");
 $("userChip").onclick = openAccount;
 modal.addEventListener("click", (e) => { if (e.target === modal || e.target.closest("[data-close]")) modal.classList.remove("open"); });
 
-async function openAccount() {
+async function openAccount(section) {
   closeSidebar();
   $("profName").value = state.user.name;
   $("profEmail").value = state.user.email;
   renderPlanCard();
   modal.classList.add("open");
   loadApps();
+  loadConnections();
+  loadTasks();
+  if (typeof section === "string") setTimeout(() => $(`${section}Section`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+}
+
+const CONN_INFO = {
+  google: { badge: "G", desc: "Gmail and Google Calendar: read, draft, send email; check and add events." },
+  github: { badge: "⌥", desc: "Read your repositories and push code or open pull requests." },
+};
+
+async function loadConnections() {
+  const list = $("connList");
+  try {
+    const { connections, capabilities } = await api("/api/connections");
+    list.innerHTML = "";
+    for (const c of connections) {
+      const row = document.createElement("div");
+      row.className = "app-row";
+      const info = CONN_INFO[c.provider] || { badge: c.name[0], desc: "" };
+      row.innerHTML = `<div class="app-badge">${esc(info.badge)}</div><div class="info"><b>${esc(c.name)}</b><small>${c.connected ? `Connected as ${esc(c.account || "your account")}` : esc(info.desc)}</small></div>`;
+      const b = document.createElement(c.connected ? "button" : "a");
+      if (c.connected) {
+        b.className = "btn btn-danger btn-sm";
+        b.textContent = "Disconnect";
+        b.onclick = async () => {
+          if (!confirm(`Disconnect ${c.name}?`)) return;
+          try { await api(`/api/connections/${c.provider}`, { method: "DELETE", body: {} }); toast(`${c.name} disconnected`); loadConnections(); }
+          catch (e) { toast(e.message, "error"); }
+        };
+      } else if (c.available) {
+        b.className = "btn btn-primary btn-sm";
+        b.textContent = "Connect";
+        b.href = `/api/connect/${c.provider}/start`;
+      } else {
+        b.className = "muted";
+        b.textContent = "Not set up yet";
+        b.style.fontSize = "12px";
+      }
+      row.append(b);
+      list.append(row);
+    }
+    const caps = [
+      ["Files & images", capabilities.files],
+      ["Image generation", capabilities.images],
+      ["Real browser", capabilities.browser],
+      ["Web search", capabilities.web_search],
+    ];
+    const capRow = document.createElement("p");
+    capRow.className = "muted caps";
+    capRow.innerHTML = caps.map(([n, on]) => `<span class="cap ${on ? "on" : ""}">${on ? "●" : "○"} ${esc(n)}</span>`).join("");
+    list.append(capRow);
+  } catch (e) { list.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
+}
+
+async function loadTasks() {
+  const list = $("taskList");
+  try {
+    const { tasks } = await api("/api/tasks");
+    if (!tasks.length) { list.innerHTML = '<p class="muted" style="margin:0">No scheduled tasks yet.</p>'; return; }
+    list.innerHTML = "";
+    for (const t of tasks) {
+      const row = document.createElement("div");
+      row.className = "app-row task-row";
+      const next = t.enabled && t.next_run_at ? `Next ${new Date(t.next_run_at).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` : "Paused";
+      row.innerHTML = `<div class="app-badge">⏱</div><div class="info"><b>${esc(t.title)}</b><small>${esc(t.schedule_text)} · ${t.deliver === "email" ? "app + email" : "in app"} · ${esc(next)}${t.last_status ? ` · Last: ${esc(t.last_status)}` : ""}</small></div>
+        <div class="task-actions"><button class="btn btn-ghost btn-sm" data-a="run">Run now</button><button class="btn btn-ghost btn-sm" data-a="toggle">${t.enabled ? "Pause" : "Resume"}</button><button class="btn btn-danger btn-sm" data-a="delete">Delete</button></div>`;
+      row.querySelector('[data-a="run"]').onclick = async (e) => {
+        setBusy(e.currentTarget, true);
+        try {
+          const r = await api(`/api/tasks/${t.id}`, { method: "POST", body: {} });
+          toast(`Ran “${t.title}”: ${r.status}`);
+          modal.classList.remove("open");
+          await loadConversations();
+          if (r.conversation_id) openConversation(r.conversation_id);
+        } catch (err) { toast(err.message, "error"); setBusy(e.currentTarget, false); }
+      };
+      row.querySelector('[data-a="toggle"]').onclick = async () => {
+        try { await api(`/api/tasks/${t.id}`, { method: "PATCH", body: { enabled: !t.enabled } }); loadTasks(); } catch (err) { toast(err.message, "error"); }
+      };
+      row.querySelector('[data-a="delete"]').onclick = async () => {
+        if (!confirm(`Delete “${t.title}”?`)) return;
+        try { await api(`/api/tasks/${t.id}`, { method: "DELETE", body: {} }); loadTasks(); } catch (err) { toast(err.message, "error"); }
+      };
+      list.append(row);
+    }
+  } catch (e) { list.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
 }
 
 function renderPlanCard() {

@@ -11,12 +11,17 @@ ehrler-systems/
 │  └─ assets/                 CSS, JS, logo.png (your logo, byte-for-byte unchanged)
 ├─ functions/api/             The backend (Pages Functions)
 │  ├─ auth/                   signup, login, logout, me, account
-│  ├─ chat.js                 Streams AI replies and saves them
+│  ├─ chat.js, chat/resume.js The agent: tool calls, approvals, code runs
+│  ├─ files/                  Uploads + generated images
+│  ├─ connect/, connections/  Google + GitHub connections
+│  ├─ tasks/                  Scheduled tasks (+ run-due for the scheduler)
 │  ├─ conversations/          List, search, open, rename, delete
 │  ├─ apps/                   Connected apps (disconnect)
 │  └─ oauth/                  client, authorize, token, userinfo, revoke
 ├─ lib/                       Shared server code (auth, OAuth, prompts…)
-├─ migrations/                 Database tables (0001 core, 0002 Ehrler Pro)
+├─ lib/tools/                 Agent tools (web, files, images, code, Google, GitHub)
+├─ migrations/                 Database tables (0001 core, 0002 Ehrler Pro, 0003 agent)
+├─ scheduler/                 Tiny cron Worker that runs scheduled tasks
 ├─ scripts/register-client.mjs  Registers GoVariety (or any app) for SSO
 ├─ govariety-integration/     Drop-in files for the GoVariety site
 └─ wrangler.toml
@@ -152,6 +157,46 @@ Any app that uses "Sign in with Ehrler Systems" can see Pro status:
 
 - `GET /api/oauth/userinfo` now includes `plan` (`"free"`/`"pro"`), `pro` (true/false), `pro_until` (ms) and `entitlements` (`["pro"]` for Pro).
 - `POST /api/oauth/entitlements` (server-to-server, client secret required; form or JSON `sub`) returns the same fields any time, so an app can re-check without the user's tokens. It only answers for users who have connected that app.
+
+## The agent: tasks, tools and connections
+
+In Chat and Code mode, Ehrler Systems is an agent: it calls tools in a loop until the job is done. Anything that sends, changes or pushes shows an approval card first.
+
+| Tool | What it does | Needs |
+|---|---|---|
+| `read_webpage` | Reads any public page or PDF link | nothing |
+| `read_file` | Reads uploaded files (PDF, Word, Excel, CSV, code). Looks at images with a vision model | `FILES` KV binding |
+| `generate_image` | FLUX.2 images: ads, posters, photos. Edits uploaded pictures using up to 4 references | `FILES` |
+| `run_code` | Runs JavaScript or Python (Pyodide) in a sandbox in the user's browser and returns the output | nothing |
+| `gmail_*`, `calendar_*` | Search, read, draft and send email. List, create, update and delete events | Google connection |
+| `github_*` | List repos, read files, push one commit with many files, open PRs | GitHub connection |
+| `schedule_task` | "Every weekday at 7:30, summarize my inbox and email it to me" | scheduler Worker |
+| `browse` | Real headless Chrome: rendered text, screenshots, links | `CF_BROWSER_TOKEN` secret |
+| `web_search` | Web search | `BRAVE_API_KEY` secret (optional) |
+
+### One-time setup
+
+1. **Database:** run `migrations/0003_agent.sql` in the D1 console, or use `npx wrangler d1 migrations apply ehrler-systems --remote`.
+2. **File storage:** create a KV namespace called `ehrler-files` and put its id in `wrangler.toml` under `[[kv_namespaces]]`.
+3. **Google (Gmail + Calendar):**
+   - In Google Cloud Console, create a project and enable the **Gmail API** and the **Google Calendar API**.
+   - Set up the OAuth consent screen as External, in Testing, and add your own Google account as a test user.
+   - Create an OAuth client of type **Web application** with this redirect URI: `https://ehrlersystems.pages.dev/api/connect/google/callback`.
+   - Put the client ID in `GOOGLE_CLIENT_ID`. Add `GOOGLE_CLIENT_SECRET` as a Cloudflare secret.
+4. **GitHub:**
+   - Under GitHub → Settings → Developer settings → OAuth Apps → New, set the callback URL to `https://ehrlersystems.pages.dev/api/connect/github/callback`.
+   - Put the client ID in `GITHUB_CLIENT_ID`. Add `GITHUB_CLIENT_SECRET` as a secret.
+5. **Token encryption:** add a secret `TOKEN_ENCRYPTION_KEY` (any long random string). Connected-account tokens are encrypted with it. Don't change it later, or people will have to reconnect.
+6. **Scheduled tasks:**
+   - Deploy `scheduler/worker.js` as a Worker with the cron `*/5 * * * *`. In the dashboard: Workers → Create → paste the file → Settings → Triggers → Cron.
+   - Optional: set the same `SCHEDULER_KEY` secret on both the Worker and the Pages project.
+7. **Optional:**
+   - `CF_BROWSER_TOKEN` is an API token with the *Browser Rendering – Edit* permission. It turns on the real browser.
+   - `BRAVE_API_KEY` turns on web search.
+
+Account → Connections shows what's on. Tools whose setup is missing are hidden from the agent.
+
+Images cost `IMAGE_UNITS_PER_MP` units per megapixel from the monthly allowance. Scheduled runs can only use read-only tools; they can draft email but never send it to other people.
 
 ## API reference (for GoVariety or any future app)
 

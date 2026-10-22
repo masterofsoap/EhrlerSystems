@@ -16,11 +16,28 @@ database_name = "ehrler-systems"
 database_id = "1e23ee96-1e33-4f7a-901d-606682f99385"
 migrations_dir = "migrations"
 
+# Uploaded + generated files (images, PDFs, docs…) — KV namespace "ehrler-files".
+[[kv_namespaces]]
+binding = "FILES"
+id = "d9747ffa98f540f1adb8779e350a5e60"
+
 [vars]
 # Models — check current names with: npx wrangler ai models list
 CHAT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+AGENT_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct"
 CODE_MODEL = "@cf/qwen/qwen2.5-coder-32b-instruct"
 THINK_MODEL = "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b"
+VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
+IMAGE_MODEL = "@cf/black-forest-labs/flux-2-dev"
+IMAGE_UNITS_PER_MP = "2500"
+
+# Connections. Client IDs are public; the matching secrets go in Cloudflare as
+# encrypted secrets: GOOGLE_CLIENT_SECRET, GITHUB_CLIENT_SECRET, TOKEN_ENCRYPTION_KEY.
+GOOGLE_CLIENT_ID = ""
+GITHUB_CLIENT_ID = ""
+
+# Real headless browser (Cloudflare Browser Rendering). Add secret CF_BROWSER_TOKEN to turn it on.
+CF_ACCOUNT_ID = "dc15607a029bf7d36b3b3f90f68edec9"
 
 # Monthly usage allowance in units (≈ Cloudflare Neurons). Resets on the 1st, 00:00 UTC.
 FREE_MONTHLY_UNITS = "25000"
