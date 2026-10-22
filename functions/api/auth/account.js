@@ -1,5 +1,6 @@
 // Update profile / change password / delete account.
 import { hashPassword, publicUser, requireUser, sessionCookie, validatePassword, verifyPassword } from "../../../lib/auth.js";
+import { stripe } from "../../../lib/stripe.js";
 import { handler, HttpError, json, now, readJson } from "../../../lib/util.js";
 
 export const onRequestPatch = handler(async ({ request, env }) => {
@@ -35,8 +36,17 @@ export const onRequestDelete = handler(async ({ request, env }) => {
   if (!(await verifyPassword(String(body.password || ""), row.password_hash)))
     throw new HttpError(401, "Password is incorrect.", "bad_credentials");
 
+  // Stop billing before the account disappears.
+  const { results: subs } = await env.DB.prepare(
+    "SELECT id FROM subscriptions WHERE user_id = ? AND status IN ('active','trialing','past_due','incomplete')"
+  ).bind(user.id).all();
+  if (subs.length && env.STRIPE_SECRET_KEY) {
+    for (const s of subs) await stripe(env, "DELETE", `/subscriptions/${s.id}`);
+  }
+
   // D1 enforces foreign keys, so these cascade, but delete explicitly to be safe.
   await env.DB.batch([
+    env.DB.prepare("DELETE FROM subscriptions WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM messages WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM conversations WHERE user_id = ?").bind(user.id),
     env.DB.prepare("DELETE FROM oauth_tokens WHERE user_id = ?").bind(user.id),
