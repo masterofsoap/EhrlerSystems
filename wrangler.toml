@@ -34,7 +34,7 @@ IMAGE_UNITS_PER_MP = "2500"
 # Connections. Client IDs are public; the matching secrets go in Cloudflare as
 # encrypted secrets: GOOGLE_CLIENT_SECRET, GITHUB_CLIENT_SECRET, TOKEN_ENCRYPTION_KEY.
 GOOGLE_CLIENT_ID = ""
-GITHUB_CLIENT_ID = ""
+GITHUB_CLIENT_ID = "Ov23liWERhEAE2gfSXDD"
 
 # Real headless browser (Cloudflare Browser Rendering). Add secret CF_BROWSER_TOKEN to turn it on.
 CF_ACCOUNT_ID = "dc15607a029bf7d36b3b3f90f68edec9"
