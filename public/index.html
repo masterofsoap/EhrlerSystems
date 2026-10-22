@@ -48,6 +48,26 @@
     .fine { font-size: 12px; color: var(--muted); margin: 14px 0 0; text-align: center; }
     [hidden] { display: none !important; }
 
+    .pricing { position: relative; max-width: 1080px; width: 100%; margin: 0 auto; padding: 30px clamp(16px, 4vw, 48px) 70px; }
+    .pricing-head { text-align: center; max-width: 620px; margin: 0 auto 30px; }
+    .pricing-head h2 { font: 700 clamp(28px, 4vw, 42px)/1.05 var(--font-display); text-transform: uppercase; margin: 14px 0 12px; }
+    .pricing-head .hot { color: var(--gold); }
+    .pricing-head p { color: var(--text-2); margin: 0; }
+    .plans { display: grid; grid-template-columns: 1fr 1.1fr; gap: 16px; max-width: 760px; margin: 0 auto; }
+    .plan { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 24px; border-radius: 16px; border: 1px solid var(--line-2); background: rgba(14,16,20,.86); }
+    .plan-pro { border-color: rgba(255,200,92,.4); background: linear-gradient(170deg, rgba(255,200,92,.09), rgba(255,90,31,.05) 55%, rgba(14,16,20,.9)); }
+    .plan-pro::before { content: ""; position: absolute; top: -1px; left: 24px; width: 80px; height: 3px; background: linear-gradient(90deg, var(--gold), var(--ember)); clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%); }
+    .plan-k { font: 700 12px/1 var(--font-display); letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
+    .plan-pro .plan-k { color: var(--gold); }
+    .plan-price { font: 700 40px/1 var(--font-display); }
+    .plan-price small { font-size: 15px; color: var(--muted); font-weight: 500; margin-left: 4px; }
+    .plan ul { list-style: none; margin: 4px 0 10px; padding: 0; display: grid; align-content: start; gap: 10px; color: var(--text-2); font-size: 14px; flex: 1; }
+    .plan li { position: relative; padding-left: 20px; }
+    .plan li::before { content: ""; position: absolute; left: 0; top: 8px; width: 10px; height: 3px; background: var(--muted); transform: skewX(-35deg); }
+    .plan-pro li::before { background: var(--gold); }
+    .plan li b { color: var(--text); font-weight: 600; }
+    .plan-pro .btn-primary { background: linear-gradient(100deg, var(--gold), var(--ember-2)); }
+    @media (max-width: 720px) { .plans { grid-template-columns: 1fr; } }
     footer { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 22px clamp(16px, 4vw, 48px); border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
     footer .mono { font-family: var(--font-mono); font-size: 11.5px; }
     .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 10px var(--signal); margin-right: 8px; vertical-align: 1px; }
@@ -116,6 +136,28 @@
         <p class="fine">Email and password only. Your password is salted and hashed; we never store it.</p>
       </section>
     </main>
+
+    <section class="pricing" id="pricing" aria-label="Plans">
+      <div class="pricing-head">
+        <span class="eyebrow">Plans</span>
+        <h2>Start free. Go Pro for <span class="hot">everything</span>.</h2>
+        <p>Every account gets a monthly usage allowance. When it runs out, upgrade or wait for the 1st. Ehrler Pro also unlocks Pro in every Ehrler product.</p>
+      </div>
+      <div class="plans">
+        <div class="plan">
+          <span class="plan-k">Free</span>
+          <div class="plan-price">$0</div>
+          <ul><li>Monthly usage allowance</li><li>Chat and Code modes</li><li>Workbench: run HTML, CSS &amp; JS</li><li>One login for Ehrler apps</li></ul>
+          <a class="btn btn-ghost btn-block" href="/?mode=signup#auth" data-signup>Create free account</a>
+        </div>
+        <div class="plan plan-pro">
+          <span class="plan-k">Ehrler Pro</span>
+          <div class="plan-price">$12<small>/month</small></div>
+          <ul><li><b>About 20× the monthly usage</b></li><li><b>Think mode</b> for complex, multi-step work</li><li>Longer answers and conversation memory</li><li><b>Pro in every Ehrler product</b>, including GoVariety</li></ul>
+          <a class="btn btn-primary btn-block" href="/?mode=signup&amp;next=%2Fapp%3Fupgrade%3D1#auth">Get Ehrler Pro</a>
+        </div>
+      </div>
+    </section>
 
     <footer>
       <span><span class="status-dot"></span>All systems operational</span>
