@@ -1,0 +1,15 @@
+{
+  "name": "ehrler-systems",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev",
+    "deploy": "wrangler pages deploy",
+    "db:migrate": "wrangler d1 migrations apply ehrler-systems --remote",
+    "db:migrate:local": "wrangler d1 migrations apply ehrler-systems --local",
+    "register-client": "node scripts/register-client.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

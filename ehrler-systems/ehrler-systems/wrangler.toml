@@ -1,0 +1,26 @@
+# Ehrler Systems — Cloudflare Pages project
+name = "ehrler-systems"
+pages_build_output_dir = "./public"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Workers AI (free daily allowance, no API keys)
+[ai]
+binding = "AI"
+
+# D1 database — create it with:  npx wrangler d1 create ehrler-systems
+# then paste the database_id it prints below.
+[[d1_databases]]
+binding = "DB"
+database_name = "ehrler-systems"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[vars]
+# Models — check current names with: npx wrangler ai models list
+CHAT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+CODE_MODEL = "@cf/qwen/qwen2.5-coder-32b-instruct"
+# Per-user daily message cap (protects the free Neuron allowance)
+DAILY_MESSAGE_LIMIT = "75"
+# Set to "false" to close public sign-ups (existing accounts still work)
+SIGNUPS_OPEN = "true"

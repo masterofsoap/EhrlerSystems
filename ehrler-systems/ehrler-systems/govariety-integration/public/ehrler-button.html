@@ -1,0 +1,44 @@
+<!--
+  "Continue with Ehrler Systems" — paste the <style> and the <a> into GoVariety's
+  sign-up and sign-in screens. Copy assets/ehrler-logo.png into GoVariety's
+  public/assets folder (it's the Ehrler Systems logo, unaltered).
+
+  Sign up / sign in:   href="/auth/ehrler/start"
+  Connect in settings: href="/auth/ehrler/start?link=1&next=/settings"
+-->
+<style>
+  .ehrler-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    width: 100%; height: 48px; padding: 0 18px 0 6px;
+    background: #0d0f12; color: #eceef1; border: 1px solid rgba(255,255,255,.14); border-radius: 10px;
+    font: 600 15px/1 system-ui, -apple-system, "Segoe UI", sans-serif; text-decoration: none;
+    transition: border-color .2s, background .2s;
+  }
+  .ehrler-btn:hover { background: #13161b; border-color: #ff5a1f; }
+  .ehrler-btn img { width: 40px; height: 40px; display: block; }
+  .ehrler-divider { display: flex; align-items: center; gap: 12px; margin: 16px 0; color: #7b838e; font: 12px system-ui, sans-serif; text-transform: uppercase; letter-spacing: .12em; }
+  .ehrler-divider::before, .ehrler-divider::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,.1); }
+</style>
+
+<a class="ehrler-btn" href="/auth/ehrler/start">
+  <img src="/assets/ehrler-logo.png" alt="">
+  <span>Continue with Ehrler Systems</span>
+</a>
+<div class="ehrler-divider">or</div>
+
+<!--
+  Optional: show messages after a failed attempt. On your /login page:
+
+  <script>
+    const r = new URLSearchParams(location.search).get("ehrler");
+    const msg = {
+      email_exists: "You already have a GoVariety account with that email. Sign in with your password, then connect Ehrler Systems in Settings.",
+      cancelled: "Sign-in with Ehrler Systems was cancelled.",
+      expired: "That sign-in link expired. Please try again.",
+      failed: "We couldn't reach Ehrler Systems. Please try again.",
+      signin_first: "Sign in to GoVariety first, then connect Ehrler Systems.",
+      no_email: "Your Ehrler Systems account didn't share an email address.",
+    }[r];
+    if (msg) document.getElementById("loginError").textContent = msg;
+  </script>
+-->

@@ -1,0 +1,3 @@
+/oauth/authorize  /authorize  302
+/signup  /?mode=signup  302
+/login  /  302

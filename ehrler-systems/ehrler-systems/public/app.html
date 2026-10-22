@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en" data-mode="chat">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ehrler Systems</title>
+  <meta name="theme-color" content="#060709">
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/assets/base.css">
+  <link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+  <div class="backdrop" aria-hidden="true"></div>
+  <div class="shell">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar" aria-label="Conversations">
+      <div class="side-top">
+        <a class="side-brand" href="/app" id="homeLink">
+          <img class="logo" src="/assets/logo.png" alt="Ehrler Systems logo">
+          <span>Ehrler<b>Systems</b></span>
+        </a>
+        <button class="icon-btn" id="closeSidebar" title="Close" aria-label="Close sidebar" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="side-actions">
+        <button class="btn btn-primary new-chat" id="newChat"><span>New chat</span><kbd>Ctrl K</kbd></button>
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input class="input" id="search" type="search" placeholder="Search conversations" autocomplete="off">
+        </div>
+      </div>
+      <nav class="convos" id="convos"></nav>
+      <div class="side-foot">
+        <button class="user-chip" id="userChip" aria-label="Account settings">
+          <span class="avatar" id="avatar">·</span>
+          <span class="who"><b id="userName">…</b><small id="userEmail"></small></span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--muted)"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+
+    <!-- Main -->
+    <main class="main">
+      <div class="topbar">
+        <button class="icon-btn menu-toggle" id="openSidebar" aria-label="Open sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+        </button>
+        <div class="conv-title"><h1 id="convTitle" title="Click to rename">New conversation</h1></div>
+        <div class="mode-switch" role="group" aria-label="Mode">
+          <span class="pill"></span>
+          <button id="modeChat" aria-pressed="true" title="Chat mode (Ctrl /)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg><span>Chat</span>
+          </button>
+          <button id="modeCode" aria-pressed="false" title="Code mode (Ctrl /)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg><span>Code</span>
+          </button>
+        </div>
+        <button class="icon-btn" id="toggleWb" title="Workbench (Ctrl B)" aria-label="Toggle Workbench">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16"/></svg>
+        </button>
+      </div>
+
+      <div class="thread" id="thread">
+        <div class="thread-inner" id="threadInner"></div>
+      </div>
+
+      <div class="composer-wrap">
+        <form class="composer" id="composer">
+          <textarea id="input" rows="1" placeholder="Message Ehrler Systems…" aria-label="Message"></textarea>
+          <div class="composer-bar">
+            <span class="hint" id="modelHint"></span>
+            <span class="grow"></span>
+            <span class="usage" id="usage" title="Messages left today (resets at midnight UTC)"><span class="bar"><i id="usageBar"></i></span><span id="usageText">—</span></span>
+            <button class="btn btn-primary send" id="sendBtn" type="submit" aria-label="Send">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+        </form>
+        <p class="foot-note">Ehrler Systems runs open models and can make mistakes. Check anything important.</p>
+      </div>
+    </main>
+
+    <!-- Workbench -->
+    <aside class="workbench" id="workbench" aria-label="Workbench">
+      <div class="wb-head">
+        <h2>Workbench</h2>
+        <div class="wb-tabs" role="tablist">
+          <button role="tab" data-pane="preview" aria-selected="true">Preview</button>
+          <button role="tab" data-pane="code" aria-selected="false">Code</button>
+          <button role="tab" data-pane="console" aria-selected="false">Console<span class="count" id="consoleCount" hidden>0</span></button>
+        </div>
+        <span class="grow"></span>
+        <button class="icon-btn" id="wbClose" title="Close Workbench" aria-label="Close Workbench">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="wb-body">
+        <div>
+          <div class="wb-pane show" data-pane="preview" style="height:100%">
+            <div class="wb-placeholder" id="wbPlaceholder">
+              <b>Nothing running yet</b>
+              <span>Press <em>Run</em> on any HTML, CSS or JavaScript block — or write your own in the Code tab.</span>
+            </div>
+            <div class="wb-frame-wrap" id="wbFrameWrap" hidden><iframe class="wb-frame" id="wbFrame" title="Preview" sandbox="allow-scripts allow-modals allow-forms allow-popups"></iframe></div>
+          </div>
+          <div class="wb-pane" data-pane="code" style="height:100%">
+            <div class="wb-lang">
+              <label for="wbLang">Language</label>
+              <select id="wbLang"><option value="html">HTML</option><option value="css">CSS</option><option value="js">JavaScript</option></select>
+              <span id="wbFile" style="margin-left:auto"></span>
+            </div>
+            <div class="wb-editor-wrap">
+              <pre aria-hidden="true"><code id="wbHighlight"></code></pre>
+              <textarea id="wbEditor" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Code editor"></textarea>
+            </div>
+          </div>
+          <div class="wb-pane" data-pane="console" style="height:100%">
+            <div class="wb-console" id="wbConsole"><div class="empty-console">Console output from your preview shows up here.</div></div>
+          </div>
+        </div>
+        <div class="wb-foot">
+          <span class="status" id="wbStatus">Ready</span>
+          <span class="grow"></span>
+          <button class="btn btn-ghost btn-sm" id="wbOpen" title="Open the preview in a new tab">New tab</button>
+          <button class="btn btn-ghost btn-sm" id="wbSave">Save</button>
+          <button class="btn btn-primary btn-sm" id="wbRun">Run ▶</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Account modal -->
+  <div class="modal-scrim" id="accountModal" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="accountTitle">Account</h2>
+        <button class="icon-btn" data-close aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <section class="modal-section">
+          <h3>Profile</h3>
+          <form id="profileForm">
+            <div class="field"><label for="profName">Name</label><input class="input" id="profName" maxlength="60" required></div>
+            <div class="field"><label>Email</label><input class="input" id="profEmail" disabled></div>
+            <button class="btn btn-ghost btn-sm" type="submit">Save name</button>
+          </form>
+        </section>
+        <section class="modal-section">
+          <h3>Connected apps</h3>
+          <p class="muted" style="margin:0 0 12px">Apps you've signed into with your Ehrler Systems account.</p>
+          <div class="apps" id="appsList"><p class="muted">Loading…</p></div>
+        </section>
+        <section class="modal-section">
+          <h3>Password</h3>
+          <div id="pwNotice" class="notice"></div>
+          <form id="passwordForm">
+            <div class="row-2">
+              <div class="field"><label for="pwCurrent">Current</label><input class="input" id="pwCurrent" type="password" autocomplete="current-password" required></div>
+              <div class="field"><label for="pwNew">New</label><input class="input" id="pwNew" type="password" autocomplete="new-password" minlength="8" required></div>
+            </div>
+            <button class="btn btn-ghost btn-sm" type="submit">Change password</button>
+          </form>
+        </section>
+        <section class="modal-section">
+          <h3>Shortcuts</h3>
+          <div class="kbd-list">
+            <kbd>Ctrl K</kbd><span>New chat</span>
+            <kbd>Ctrl /</kbd><span>Switch Chat / Code mode</span>
+            <kbd>Ctrl B</kbd><span>Toggle Workbench</span>
+            <kbd>Ctrl Enter</kbd><span>Run code in the Workbench editor</span>
+            <kbd>Esc</kbd><span>Stop generating · close panels</span>
+          </div>
+        </section>
+        <section class="modal-section" style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-ghost" id="signOut">Sign out</button>
+          <button class="btn btn-danger" id="deleteAccount">Delete account</button>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/assets/app.js"></script>
+</body>
+</html>
