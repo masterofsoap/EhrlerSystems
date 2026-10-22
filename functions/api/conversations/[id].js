@@ -11,7 +11,7 @@ async function own(env, userId, id) {
 export const onRequestGet = handler(async ({ request, env, params }) => {
   const user = await requireUser(env, request);
   const conversation = await own(env, user.id, params.id);
-  const { results } = await env.DB.prepare("SELECT id, role, content, model, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at ASC")
+  const { results } = await env.DB.prepare("SELECT id, role, content, model, parts, created_at FROM messages WHERE conversation_id = ? ORDER BY created_at ASC")
     .bind(conversation.id)
     .all();
   return json({ conversation, messages: results });
