@@ -20,7 +20,20 @@ migrations_dir = "migrations"
 # Models — check current names with: npx wrangler ai models list
 CHAT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 CODE_MODEL = "@cf/qwen/qwen2.5-coder-32b-instruct"
-# Per-user daily message cap (protects the free Neuron allowance)
-DAILY_MESSAGE_LIMIT = "75"
+THINK_MODEL = "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b"
+
+# Monthly usage allowance in units (≈ Cloudflare Neurons). Resets on the 1st, 00:00 UTC.
+FREE_MONTHLY_UNITS = "25000"
+PRO_MONTHLY_UNITS = "500000"
+
+# Ehrler Pro billing (Stripe). These IDs are from the Stripe SANDBOX.
+# Secrets (set in Cloudflare, never here): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+STRIPE_PRICE_ID = "price_1UTGlvD2P4jaeBDuiswG3e5m"
+STRIPE_PRODUCT_ID = "ehrler_pro"
+PRO_PRICE_LABEL = "$12/month"
+
+# Comma-separated emails that get Pro free (e.g. you).
+COMPLIMENTARY_PRO_EMAILS = ""
+
 # Set to "false" to close public sign-ups (existing accounts still work)
 SIGNUPS_OPEN = "true"
