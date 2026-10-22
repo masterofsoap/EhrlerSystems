@@ -40,7 +40,7 @@
         <button class="user-chip" id="userChip" aria-label="Account settings">
           <span class="avatar" id="avatar">·</span>
           <span class="who"><b><span id="userName">…</span><i class="pro-badge" id="proBadge" hidden>PRO</i></b><small id="userEmail"></small></span>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--muted)"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--muted)"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.820-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
       </div>
     </aside>
@@ -80,8 +80,12 @@
           <button class="btn btn-primary btn-sm" id="lbUpgrade" data-upgrade>Upgrade to Pro</button>
         </div>
         <form class="composer" id="composer">
+          <div class="attachments" id="attachments" hidden></div>
           <textarea id="input" rows="1" placeholder="Message Ehrler Systems…" aria-label="Message"></textarea>
           <div class="composer-bar">
+            <button type="button" class="icon-btn attach" id="attachBtn" title="Attach files or images (or paste / drop them)" aria-label="Attach files">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.4 11.6-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg>
+            </button>
             <span class="hint" id="modelHint"></span>
             <span class="grow"></span>
             <button type="button" class="usage" id="usage" title="Monthly usage"><span class="bar"><i id="usageBar"></i></span><span id="usageText">—</span></button>
@@ -162,6 +166,16 @@
             <div class="field"><label>Email</label><input class="input" id="profEmail" disabled></div>
             <button class="btn btn-ghost btn-sm" type="submit">Save name</button>
           </form>
+        </section>
+        <section class="modal-section" id="connectionsSection">
+          <h3>Connections</h3>
+          <p class="muted" style="margin:0 0 12px">Let Ehrler Systems work with your accounts. Anything that sends, changes or pushes asks you first.</p>
+          <div class="apps" id="connList"><p class="muted">Loading…</p></div>
+        </section>
+        <section class="modal-section" id="tasksSection">
+          <h3>Scheduled tasks</h3>
+          <p class="muted" style="margin:0 0 12px">Ask in chat, e.g. “every weekday at 7:30, summarize my inbox and email it to me.”</p>
+          <div class="apps" id="taskList"><p class="muted">Loading…</p></div>
         </section>
         <section class="modal-section">
           <h3>Connected apps</h3>
