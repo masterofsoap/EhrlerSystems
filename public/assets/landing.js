@@ -24,6 +24,7 @@ function selectTab(which) {
 $("tabLogin").onclick = () => selectTab("login");
 $("tabSignup").onclick = () => selectTab("signup");
 if (params.get("mode") === "signup") selectTab("signup");
+document.querySelectorAll("[data-signup]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); selectTab("signup"); $("auth").scrollIntoView({ behavior: "smooth" }); }));
 $("jumpSignin").onclick = (e) => { e.preventDefault(); selectTab("login"); $("auth").scrollIntoView({ behavior: "smooth" }); };
 
 document.querySelectorAll(".pw-toggle").forEach((b) => {
