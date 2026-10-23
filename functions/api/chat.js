@@ -132,5 +132,8 @@ function describeParts(partsJson) {
   let parts = [];
   try { parts = JSON.parse(partsJson || "[]") || []; } catch {}
   const imgs = parts.filter((p) => p.type === "image");
-  return imgs.length ? "\n\n[Images shown: " + imgs.map((i) => `${i.name} (id ${i.file_id})`).join(", ") + "]" : "";
+  return imgs.length
+    ? "\n\n[To make this reply you called the generate_image tool, which created and showed: " + imgs.map((i) => `${i.name} (id ${i.file_id})`).join(", ") +
+      ". Writing text never creates an image — every new or changed image needs a new generate_image call.]"
+    : "";
 }
