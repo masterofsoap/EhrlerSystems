@@ -18,8 +18,8 @@ const SUGGESTIONS = {
   chat: [
     ["Make an ad", "Create a bold Instagram ad for a neighborhood coffee shop called Ember Roast: moody lighting, latte art, the headline \"Wake Up Warm\". Square format."],
     ["Read a page", "Read https://developers.cloudflare.com/workers-ai/ and give me the 5 most useful things it can do, in plain English."],
-    ["Plan my day", "What's on my calendar today and what unread emails need a reply? Draft the replies for me to review."],
-    ["Every morning", "Every weekday at 7:30am, summarize my unread email and today's calendar and email me the summary."],
+    ["Run some code", "Write a JavaScript function that checks if a word is a palindrome, test it on 5 examples, and show me the results."],
+    ["Every morning", "Every weekday at 7:30am, read https://news.ycombinator.com and give me the 5 most interesting stories in one line each."],
   ],
   code: [
     ["Build a UI", "Build a single-file HTML page with a glowing, animated countdown timer I can start and pause."],
